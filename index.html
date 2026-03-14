@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RGB-Mischer</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; }
+    .row { display: grid; grid-template-columns: 80px 1fr 60px; gap: 12px; align-items: center; margin: 10px 0; }
+    #swatch { height: 140px; border: 1px solid #ccc; border-radius: 8px; }
+    code { user-select: all; }
+  </style>
+</head>
+<body>
+  <h3>Additive Farbmischung (RGB)</h3>
+
+  <div class="row"><label for="r">Rot</label>  <input id="r" type="range" min="0" max="255" value="0"> <span id="rv">0</span></div>
+  <div class="row"><label for="g">Grün</label> <input id="g" type="range" min="0" max="255" value="0"> <span id="gv">0</span></div>
+  <div class="row"><label for="b">Blau</label> <input id="b" type="range" min="0" max="255" value="0"> <span id="bv">0</span></div>
+
+  <div id="swatch"></div>
+  <p>Farbwert: <code id="rgbtxt">rgb(0,0,0)</code></p>
+
+  <script>
+    const r = document.getElementById('r'), g = document.getElementById('g'), b = document.getElementById('b');
+    const rv = document.getElementById('rv'), gv = document.getElementById('gv'), bv = document.getElementById('bv');
+    const swatch = document.getElementById('swatch'), rgbtxt = document.getElementById('rgbtxt');
+
+    function update() {
+      rv.textContent = r.value; gv.textContent = g.value; bv.textContent = b.value;
+      const css = `rgb(${r.value},${g.value},${b.value})`;
+      swatch.style.background = css;
+      rgbtxt.textContent = css;
+    }
+    [r,g,b].forEach(x => x.addEventListener('input', update));
+    update();
+  </script>
+</body>
+</html>

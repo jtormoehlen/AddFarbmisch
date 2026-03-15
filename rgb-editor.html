@@ -1,0 +1,128 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RGB Kanalregeln Editor</title>
+<style>
+  body{font:14px system-ui,Segoe UI,Arial,sans-serif;margin:16px}
+  h1{margin:0 0 10px;font-size:28px}
+  #top{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+  #drop{border:2px dashed #bbb;border-radius:10px;padding:14px;min-width:280px}
+  #drop.drag{border-color:#333;background:#fafafa}
+  #rules{width:360px;max-width:100%;height:140px}
+  #msg{color:#b00;white-space:pre-wrap;margin-top:8px;min-height:1em}
+  canvas{max-width:100%;border:1px solid #ddd;border-radius:8px;margin-top:14px}
+  .hint{color:#555}
+</style>
+
+<h1>RGB Kanalregeln Editor</h1>
+
+<div id="top">
+  <div id="drop">
+    <div><b>Drag & Drop</b> JPG/PNG hierher</div>
+    <div style="margin-top:8px">
+      <label>Oder laden:
+        <input id="file" type="file" accept="image/png,image/jpeg">
+      </label>
+    </div>
+    <div class="hint" style="margin-top:8px">
+      Hinweise: Variablen <code>r</code>, <code>g</code>, <code>b</code> (0…255).<br>
+      Funktionen: <code>clamp(x)</code>, <code>min(a,b)</code>, <code>max(a,b)</code>
+    </div>
+  </div>
+
+  <div>
+    <div style="margin:2px 0 6px"><b>Kanalregeln</b> (eine pro Zeile)</div>
+    <textarea id="rules">red = r
+green = g
+blue = b</textarea>
+    <div class="hint" style="margin-top:6px">
+      Beispiele: <code>red=r-10</code>, <code>green=g*0.9</code>, <code>blue=(r+g)/2</code>
+    </div>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<canvas id="cv"></canvas>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const drop = $("#drop"), file = $("#file"), rules = $("#rules"), msg = $("#msg");
+  const cv = $("#cv"), cx = cv.getContext("2d", { willReadFrequently:true });
+  let base = null; // original ImageData
+
+  const clamp = x => x<0?0:x>255?255:x;
+  const compile = () => {
+    msg.textContent = "";
+    let fr = (r,g,b)=>r, fg = (r,g,b)=>g, fb = (r,g,b)=>b;
+    try{
+      const lines = rules.value.split(/\n/).map(s=>s.trim()).filter(Boolean);
+      for(const ln of lines){
+        const m = ln.match(/^(red|green|blue)\s*=\s*(.+)$/i);
+        if(!m) continue;
+        const ch = m[1].toLowerCase(), expr = m[2];
+        const fn = new Function("r","g","b","clamp","min","max",
+          `"use strict"; return (${expr});`
+        );
+        const wrap = (r,g,b) => clamp(Math.round(fn(r,g,b,clamp,Math.min,Math.max)));
+        if(ch==="red") fr=wrap;
+        if(ch==="green") fg=wrap;
+        if(ch==="blue") fb=wrap;
+      }
+      return {fr,fg,fb};
+    } catch(e){
+      msg.textContent = "Regel-Fehler: " + (e && e.message ? e.message : e);
+      return null;
+    }
+  };
+
+  const render = () => {
+    if(!base) return;
+    const f = compile();
+    if(!f) return;
+
+    const out = new ImageData(new Uint8ClampedArray(base.data), base.width, base.height);
+    const d = out.data, s = base.data;
+    for(let i=0;i<d.length;i+=4){
+      const r = s[i], g = s[i+1], b = s[i+2];
+      d[i]   = f.fr(r,g,b);
+      d[i+1] = f.fg(r,g,b);
+      d[i+2] = f.fb(r,g,b);
+      // alpha bleibt:
+      // d[i+3] = s[i+3];
+    }
+    cx.putImageData(out,0,0);
+  };
+
+  const loadImg = (blob) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      cv.width = img.naturalWidth;
+      cv.height = img.naturalHeight;
+      cx.drawImage(img,0,0);
+      base = cx.getImageData(0,0,cv.width,cv.height);
+      render();
+    };
+    img.onerror = () => { msg.textContent = "Konnte Bild nicht laden."; };
+    img.src = url;
+  };
+
+  // UI events
+  rules.addEventListener("input", () => render());
+
+  file.addEventListener("change", e => {
+    const f = e.target.files && e.target.files[0];
+    if(f) loadImg(f);
+  });
+
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+  drop.addEventListener("drop", e => {
+    e.preventDefault(); drop.classList.remove("drag");
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) loadImg(f);
+  });
+})();
+</script>

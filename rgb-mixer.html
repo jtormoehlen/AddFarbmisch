@@ -7,33 +7,87 @@
   <style>
     body { font-family: system-ui, sans-serif; margin: 16px; }
     .row { display: grid; grid-template-columns: 80px 1fr 60px; gap: 12px; align-items: center; margin: 10px 0; }
+    .detail { grid-column: 2 / 4; margin-top: -6px; font-family: ui-monospace, Consolas, monospace; color: #444; }
     #swatch { height: 140px; border: 1px solid #ccc; border-radius: 8px; }
-    code { user-select: all; }
+    code { user-select: all; font-size: 1.15em; }
+    #hexin { font-family: ui-monospace, Consolas, monospace; font-size: 1em; width: 7em; padding: 2px 4px; }
+    #hexin.invalid { border-color: #c00; outline-color: #c00; }
+    #hexmsg { color: #c00; margin-left: 8px; }
   </style>
 </head>
 <body>
   <h3>Additive Farbmischung (RGB)</h3>
 
-  <div class="row"><label for="r">Rot</label>  <input id="r" type="range" min="0" max="255" value="0"> <span id="rv">0</span></div>
-  <div class="row"><label for="g">Grün</label> <input id="g" type="range" min="0" max="255" value="0"> <span id="gv">0</span></div>
-  <div class="row"><label for="b">Blau</label> <input id="b" type="range" min="0" max="255" value="0"> <span id="bv">0</span></div>
+  <div class="row"><label for="r">Rot</label>  <input id="r" type="range" min="0" max="255" value="0"> <span id="rv">0</span><span class="detail" id="rd" hidden></span></div>
+  <div class="row"><label for="g">Grün</label> <input id="g" type="range" min="0" max="255" value="0"> <span id="gv">0</span><span class="detail" id="gd" hidden></span></div>
+  <div class="row"><label for="b">Blau</label> <input id="b" type="range" min="0" max="255" value="0"> <span id="bv">0</span><span class="detail" id="bd" hidden></span></div>
 
   <div id="swatch"></div>
   <p>Farbwert: <code id="rgbtxt">rgb(0,0,0)</code></p>
+  <p>Farbcode: <code id="hextxt">#000000</code></p>
+  <p>
+    <label for="hexin">Farbcode eingeben:</label>
+    <input id="hexin" type="text" maxlength="7" placeholder="#FF8000" spellcheck="false" autocomplete="off">
+    <span id="hexmsg" aria-live="polite"></span>
+  </p>
+  <p><label><input id="details" type="checkbox"> Bits und Hex-Ziffern je Anteil anzeigen</label></p>
 
   <script>
-    const r = document.getElementById('r'), g = document.getElementById('g'), b = document.getElementById('b');
-    const rv = document.getElementById('rv'), gv = document.getElementById('gv'), bv = document.getElementById('bv');
-    const swatch = document.getElementById('swatch'), rgbtxt = document.getElementById('rgbtxt');
+    (function () {
+      const r = document.getElementById('r'), g = document.getElementById('g'), b = document.getElementById('b');
+      const rv = document.getElementById('rv'), gv = document.getElementById('gv'), bv = document.getElementById('bv');
+      const rd = document.getElementById('rd'), gd = document.getElementById('gd'), bd = document.getElementById('bd');
+      const swatch = document.getElementById('swatch'), rgbtxt = document.getElementById('rgbtxt'), hextxt = document.getElementById('hextxt');
+      const hexin = document.getElementById('hexin'), hexmsg = document.getElementById('hexmsg'), details = document.getElementById('details');
 
-    function update() {
-      rv.textContent = r.value; gv.textContent = g.value; bv.textContent = b.value;
-      const css = `rgb(${r.value},${g.value},${b.value})`;
-      swatch.style.background = css;
-      rgbtxt.textContent = css;
-    }
-    [r,g,b].forEach(x => x.addEventListener('input', update));
-    update();
+      const hex2 = v => Number(v).toString(16).toUpperCase().padStart(2, '0');
+      const bits = v => Number(v).toString(2).padStart(8, '0');
+
+      // 8 Bit in zwei 4er-Bloecke: jeder Block ist genau eine Hex-Ziffer
+      function detailText(v) {
+        const s = bits(v), h = hex2(v);
+        return `${s.slice(0, 4)} ${s.slice(4)}  →  ${h[0]} ${h[1]}`;
+      }
+
+      function update() {
+        rv.textContent = r.value; gv.textContent = g.value; bv.textContent = b.value;
+        const css = `rgb(${r.value},${g.value},${b.value})`;
+        const hex = '#' + hex2(r.value) + hex2(g.value) + hex2(b.value);
+        swatch.style.background = css;
+        rgbtxt.textContent = css;
+        hextxt.textContent = hex;
+        rd.textContent = detailText(r.value); gd.textContent = detailText(g.value); bd.textContent = detailText(b.value);
+      }
+
+      function readHex() {
+        const s = hexin.value.trim().replace(/^#/, '');
+        if (!/^[0-9a-fA-F]*$/.test(s) || s.length > 6) {
+          hexin.classList.add('invalid');
+          hexmsg.textContent = s.length > 6 ? 'Ein Farbcode hat genau 6 Hex-Ziffern.' : 'Hex-Ziffern sind nur 0–9 und A–F.';
+          return;
+        }
+        hexin.classList.remove('invalid'); hexmsg.textContent = '';
+        if (s.length < 6) return;   // noch nicht fertig getippt
+        r.value = parseInt(s.slice(0, 2), 16);
+        g.value = parseInt(s.slice(2, 4), 16);
+        b.value = parseInt(s.slice(4, 6), 16);
+        update();
+      }
+
+      function showDetails() {
+        [rd, gd, bd].forEach(x => { x.hidden = !details.checked; });
+      }
+
+      [r, g, b].forEach(x => x.addEventListener('input', function () {
+        hexin.value = ''; hexin.classList.remove('invalid'); hexmsg.textContent = '';
+        update();
+      }));
+      hexin.addEventListener('input', readHex);
+      details.addEventListener('change', showDetails);
+
+      update();
+      showDetails();
+    })();
   </script>
 </body>
 </html>
